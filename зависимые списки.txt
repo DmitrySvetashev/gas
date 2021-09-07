@@ -1,0 +1,58 @@
+/* скрипт зависимых списков любого уровня вложенности
+   написал Светашев Дмитрий d.sve@mail.ru
+   
+   на листе справочника задается первый уровень в виде именованного диапазона, скажем LEVEL1, включающий все значения первого уровня без заголовка
+   все уровни задаются именованным диапазоном SELECTION (обязательно КАПСЛОКОМ) - также все значения без заголовков.
+   порядок следования значений в уровнях и подуровнях значения не имеет, но уровни должны быть логически заполнены, тоесть 1, 1-2, 1-2-3, 1-2-3-4. Не должно быть 1-3 или 1-2-4
+   на любом листе, где планируется использование выбора, столбцы выбора должны идти друг за другом по возрастанию уровня без пустых столбцов
+   наименование этих столбцов имеет значение для определения уровня - исправте скрипт в строках 26-28 нужными вам значениями (обязательно КАПСЛОКОМ)
+   на первый столбец (первый уровень) накладывается проверка данных - выбор из диапазона - именованный диапазон LEVEL1. на остальные ничего не надо.
+   при выборе первого уровня таблица подтягивает данные из LEVEL1, в зависимости от значения в текущей ячейке на ячейку справа накладывается проверка данных - выбор из списка
+   список - значения следующего уровня для данного значения текущего уровня
+   если вы измените значение в каком-от уровне, для которого нет значений подуровня - проверка данных выдаст ошибку (данные останутся).  
+   уровни вложенности ограничены только размером диапазона SELECTION и добавлением строк 26-28 с новыми именами столбцов уровней
+   
+*/
+
+// функция выполняется при редактировании ячейки
+function onEdit() {
+  // пролучаем текущие координаты
+  var col = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveCell().getColumn();
+  var row = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveCell().getRow();
+  // получаем заголовок текущего уровня
+  var lvlName = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(1,col).getValue().toString().toUpperCase();
+  // в зависимости от заготовка определяем колонку уровня в SELECTION
+  var lvl = 0;
+  if (lvlName == "LEVEL1") lvl = 1; 
+  if (lvlName == "LEVEL2") lvl = 2; 
+  if (lvlName == "LEVEL3") lvl = 3;
+  if (lvl > 0) {
+    var lvUp = "";
+    for (var j=lvl; j>0; j--) lvUp = lvUp + SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(row,col-j+1).getValue().toString().toUpperCase();
+    // вытаскиваем справочник в массив
+    var levelRange = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("SELECTION").getValues();
+    // ищем значения следующего уровня для значения текущего
+    var criteries = levelRange.getSubLevel(lvUp,lvl);
+    if (criteries.length > 1) criteries = criteries.substr(0,criteries.length-1);
+    // получаем правило для следующего уровня
+    var crit = criteries.split(",");
+    // устанавливаем правило в ячейку справа от текущей (сл уровень)
+    SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(row,col+1).clearDataValidations();
+    if (criteries.length > 0) {
+      var rule = SpreadsheetApp.newDataValidation().requireValueInList(crit).build();
+      SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(row,col+1).setDataValidation(rule);
+      }
+    }
+}
+
+// функция поиска значений следующего уровня
+Array.prototype.getSubLevel = function(levelUp,colSel){
+  var criteriaList = "";
+  var lvlUpVol = ""; 
+  for (var i=0; i<this.length; i++) {
+    lvlUpVol = "";
+    for (var j=0; j<colSel; j++) lvlUpVol = lvlUpVol + this[i][j].toUpperCase();
+    if (lvlUpVol == levelUp) criteriaList = criteriaList + this[i][colSel] +  ",";
+  }
+  return criteriaList;
+}

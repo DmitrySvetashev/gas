@@ -1,0 +1,145 @@
+// скрипт для простановки оплаты за помещение из программы paykeeper в google sheet таблицу
+// данные по оплате берутся из почтового ящика в виде писем, разбираются
+// после чего в листах таблицы ищется клиент, с нужным номером договора и помещением, за которое поступила оплата
+// и оплата проставляется на то количество месяцев, за которое пришел платеж
+
+// создание меню команд
+function onOpen() {
+  SpreadsheetApp.getUi()
+  // добавление пункта меню в оболочку
+  .createMenu('Команды')
+  // добавление подпунктов
+  .addItem('Проставить оплату', 'mailSync')
+  .addItem('Синхронизировать контакты', 'contSync')
+  .addToUi();
+}
+
+// заполнение информации об оплате
+function mailSync() {
+//  var emailCount = 0;
+  var payCount = 0;
+  // получаем список цепочек входящих писем
+  var threads = GmailApp.getInboxThreads();
+  for (var i = 0; i < threads.length; i++) {
+//    if (emailCount > 0) {break}
+    // получаем текущее сообщение из цепочки
+    var messages = threads[i].getMessages();
+    for (var j = 0; j < messages.length; j++) {
+    if (emailCount > 0) {break}
+      var mailSender = messages[j].getFrom();
+      var mailSenderAddr = (mailSender.split("<")[1]).split(">")[0];
+      // проверяем, если сообщение от нужного адресата и оно не прочитано - наш клиент
+      if ((mailSenderAddr == "3700404@gmail.com") & (messages[j].isUnread())) {
+        emailCount ++;
+        var foundCell = 0;
+        // получаем тело письма и потрошим его по ключевым фразам
+        var messBody = (messages[j].getBody());
+//        var messBody = "<br><br><b>Платеж от:</b> Костров Дмитрий Сергеевич<br><b>на сумму:</b> 8000.00 р.<br><b>описание услуги:</b> аренда кладовочки №: x44<br><b>период оплаты: </b> С 24.08.2021 По 22.10.2021 </div>";
+//        var messBody = "<br><br><b>Платеж от:</b> Прокофьев Александр Викторович<br><b>на сумму:</b> 4000.00 р.<br><b>описание услуги:</b> аренда кладовочки №: A2<br><b>период оплаты: </b> С 24.03./2022 По 22.05.2022 </div>";
+//        var messBody = "<br><br><b>Платеж от:</b> Фомин Денис Леонидович<br><b>на сумму:</b> 3500.00 р.<br><b>описание услуги:</b> аренда кладовочки №: 54<br><b>период оплаты: </b> С 24.01.2022 По 22.03.2022 </div>";
+        var fioStart = messBody.indexOf("Платеж от:");
+        if (fioStart < 0) {break}
+        var sumStart = messBody.indexOf("на сумму:");
+        var srvStart = messBody.indexOf("описание услуги:");
+        var payStart = messBody.indexOf("период оплаты:");
+        var fioArr = messBody.substring(fioStart,sumStart);
+        var sumArr = messBody.substring(sumStart,srvStart);
+        var srvArr = messBody.substring(srvStart,payStart);
+        var payArr = messBody.substr(payStart,messBody.length-payStart);
+        // выделяем нужную информацию о заказчике, сумме, помещении и периоде
+        var clientFio = strBwn (fioArr,"</b> ", "<br>");
+        var clientSum = strBwn (sumArr,"</b> ", " р.");
+        var clientSrv = strBwn (srvArr,"№: ", "<br>");
+        var clientDat = strBwn (payArr,"С ", " ");
+        var clientDatS = clientDat.substr(0,10);
+        var clientDatE = clientDat.substr(14,10);
+
+        // задаем правила поиска помещений
+        if (clientSrv.charCodeAt(0) > 47) var paySheetName = "Оплата Кап"
+        if (clientSrv.charCodeAt(0) > 64) var paySheetName = "Оплата Бел"
+        if (clientSrv.charCodeAt(0) > 96) var paySheetName = "Оплата НО"
+
+        // помечаем сообщение как прочитанное
+        messages[j].markRead();
+
+        // получаем список листов
+        var sheetsOf = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+        for (var k = 0; k< sheetsOf.length; k++){
+          // если абонент найден - выходим из цикла
+          if (foundCell>0) {break}
+          var curSheetName = sheetsOf[k].getSheetName();
+          // если наименование листа совпадает с правилом - будем искать в нем помещение+фио клиента
+          if (curSheetName == paySheetName) {
+          // определяем зону платежей = имя таблицы с _ вместо пробела
+          var payTable = SpreadsheetApp.getActiveSpreadsheet().getRangeByName(curSheetName.substr(0,6)+"_"+curSheetName.substr(7,curSheetName.length-7));
+          var lastRow = payTable.getLastRow();
+          var rooms = sheetsOf[k].getRange(2,1,lastRow,1).getValues();
+          var clients = sheetsOf[k].getRange(2,9,lastRow,1).getValues();
+          var payDog = sheetsOf[k].getRange(2,5,lastRow,1).getValues();
+
+          foundCell = rooms.findIndex(clientSrv);
+          if (foundCell > 0) {
+            var endCC = clients[foundCell][0].indexOf("Договор");
+            var curCli = clients[foundCell][0].substr(0,endCC-1);
+            if (clientFio == curCli) {
+              payCount++;
+              var payMonthArr = sheetsOf[k].getRange(foundCell+2,payTable.getColumn(),1,30);
+              // оплата производится в зону именованного диапазона оплат
+              var payMonth = Number(clientDatS.split(".")[1])+12*(Number(clientDatS.split(".")[2])-2021);
+              var remMonth = Number(clientDatE.split(".")[1])+12*(Number(clientDatE.split(".")[2])-2021);
+              var payMonthArr = sheetsOf[k].getRange(foundCell+2,payTable.getColumn(),1,remMonth);
+              var payBefore = payMonthArr.getCell(1,payMonth).getValue();
+              payMonthArr.getCell(1,payMonth).setValue(Number(clientSum)+payBefore);
+              var colourSet = Math.trunc((Number(clientSum)+payBefore)/payDog[foundCell][0]);
+
+// Logger.log("paymonth = %s, remmonth = %s, дог оплата = %s, тек оплата %s, colourset = %s",payMonth,remMonth,payDog[foundCell][0],Number(clientSum)+payBefore,colourSet);
+
+              if (colourSet > 0) sheetsOf[k].getRange(foundCell+2,payTable.getColumn()+payMonth-1,1,colourSet).setBackground("lime");
+              payMonthArr.getCell(1,remMonth).setNote("Требуется оплата " + clientDatE);
+              payMonthArr.getCell(1,remMonth).setBackground("yellow");
+            }
+          }
+        }
+      }
+    }
+    }
+  }
+  // выводим статистику
+  var statInfo = String(emailCount) + " писем обработано. " + String(payCount) + " оплат внесено";
+  SpreadsheetApp.getActiveSpreadsheet().toast(statInfo, "Статус", 3);
+}
+
+// функция поиска строки между fStr и lStr
+function strBwn (str, fStr, lStr) {
+  var fNdx = str.indexOf(fStr) + fStr.length;
+  var lNdx = str.lastIndexOf(lStr);
+  return str.substring(fNdx,lNdx);
+}
+
+// заполнение листа "Арендаторы"
+function contSync() {
+// получение данных из группы "Арендаторы" Контактов
+var clientsG = ContactsApp.getContactGroup("Арендаторы");
+var clients = clientsG.getContacts();
+// получение текущего положения
+var curSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Арендаторы");
+// очистка
+curSheet.getRange(2,2,500,7).clear();
+// заполнение полей данными
+for (var i=0; i<clients.length; i++) {
+  curSheet.getRange(i+2, 2, 1, 1).setValue(clients[i].getGivenName());
+  curSheet.getRange(i+2, 3, 1, 1).setValue(clients[i].getFamilyName());  
+  curSheet.getRange(i+2, 5, 1, 1).setValue(clients[i].getCompanies()[0].getJobTitle());
+  curSheet.getRange(i+2, 6, 1, 1).setValue(clients[i].getEmails()[0].getAddress()); 
+  curSheet.getRange(i+2, 7, 1, 1).setValue(clients[i].getPhones()[0].getPhoneNumber()); 
+  curSheet.getRange(i+2, 8, 1, 1).setValue(clients[i].getNotes()); 
+  }
+}
+
+// функция поиска значения в массиве
+Array.prototype.findIndex = function(search){
+  if(search == "") return -1;
+  for (var i=0; i<this.length; i++)
+    if (this[i] == search) return i;
+  return -1;
+}
