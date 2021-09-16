@@ -1,131 +1,180 @@
-// скрипт для простановки оплаты за помещение из программы paykeeper в google sheet таблицу
-// данные по оплате берутся из почтового ящика в виде писем, разбираются
-// после чего в листах таблицы ищется клиент, с нужным номером договора и помещением, за которое поступила оплата
-// и оплата проставляется на то количество месяцев, за которое пришел платеж
-
-// создание меню команд
+// СЃРѕР·РґР°РЅРёРµ РјРµРЅСЋ РєРѕРјР°РЅРґ
 function onOpen() {
   SpreadsheetApp.getUi()
-  // добавление пункта меню в оболочку
-  .createMenu('Команды')
-  // добавление подпунктов
-  .addItem('Проставить оплату', 'mailSync')
-  .addItem('Синхронизировать контакты', 'contSync')
+  // РґРѕР±Р°РІР»РµРЅРёРµ РїСѓРЅРєС‚Р° РјРµРЅСЋ РІ РѕР±РѕР»РѕС‡РєСѓ
+  .createMenu('РљРѕРјР°РЅРґС‹')
+  // РґРѕР±Р°РІР»РµРЅРёРµ РїРѕРґРїСѓРЅРєС‚РѕРІ
+  .addItem('РџСЂРѕСЃС‚Р°РІРёС‚СЊ РѕРїР»Р°С‚Сѓ', 'mailSync')
+  .addItem('РЎРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°С‚СЊ РєРѕРЅС‚Р°РєС‚С‹', 'contSync')
   .addToUi();
 }
 
-// заполнение информации об оплате
+// Р·Р°РїРѕР»РЅРµРЅРёРµ РёРЅС„РѕСЂРјР°С†РёРё РѕР± РѕРїР»Р°С‚Рµ
 function mailSync() {
-//  var emailCount = 0;
+  var emailCount = 0;
   var payCount = 0;
-  // получаем список цепочек входящих писем
+  // РїРѕР»СѓС‡Р°РµРј СЃРїРёСЃРѕРє С†РµРїРѕС‡РµРє РІС…РѕРґСЏС‰РёС… РїРёСЃРµРј
+
+var debugSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Debug');
+var lastRowDebug = 1;
+debugSheet.getRange(2,1,999,20).clearContent();
+
   var threads = GmailApp.getInboxThreads();
   for (var i = 0; i < threads.length; i++) {
+
 //    if (emailCount > 0) {break}
-    // получаем текущее сообщение из цепочки
+    // РїРѕР»СѓС‡Р°РµРј С‚РµРєСѓС‰РµРµ СЃРѕРѕР±С‰РµРЅРёРµ РёР· С†РµРїРѕС‡РєРё
     var messages = threads[i].getMessages();
     for (var j = 0; j < messages.length; j++) {
-    if (emailCount > 0) {break}
+//    if (emailCount > 0) {break}
       var mailSender = messages[j].getFrom();
-      var mailSenderAddr = (mailSender.split("<")[1]).split(">")[0];
-      // проверяем, если сообщение от нужного адресата и оно не прочитано - наш клиент
-      if ((mailSenderAddr == "3700404@gmail.com") & (messages[j].isUnread())) {
+      var mailSenderAddr = mailSender.search("3700404@gmail.com");
+
+//mailSenderAddr = 11;
+
+lastRowDebug++;
+debugSheet.getRange(lastRowDebug,1).setValue(mailSender);
+debugSheet.getRange(lastRowDebug,2).setValue(mailSenderAddr);
+
+      // РїСЂРѕРІРµСЂСЏРµРј, РµСЃР»Рё СЃРѕРѕР±С‰РµРЅРёРµ РѕС‚ РЅСѓР¶РЅРѕРіРѕ Р°РґСЂРµСЃР°С‚Р° Рё РѕРЅРѕ РЅРµ РїСЂРѕС‡РёС‚Р°РЅРѕ - РЅР°С€ РєР»РёРµРЅС‚
+      if ((mailSenderAddr > 0) & (messages[j].isUnread())) {
+        // РїРѕРјРµС‡Р°РµРј СЃРѕРѕР±С‰РµРЅРёРµ Р·РІРµР·РґРѕС‡РєРѕР№ - РЅР°С‡Р°Р»Рѕ РѕР±СЂР°Р±РѕС‚РєРё
+        messages[j].star();
+        var messMonth = (messages[j].getDate().getFullYear()-2021)*12+messages[j].getDate().getMonth()+1;
         emailCount ++;
+
+debugSheet.getRange(lastRowDebug,3).setValue(messages[j].getDate());      
+debugSheet.getRange(lastRowDebug,4).setValue(messMonth);
+
         var foundCell = 0;
-        // получаем тело письма и потрошим его по ключевым фразам
-        var messBody = (messages[j].getBody());
-//        var messBody = "<br><br><b>Платеж от:</b> Костров Дмитрий Сергеевич<br><b>на сумму:</b> 8000.00 р.<br><b>описание услуги:</b> аренда кладовочки №: x44<br><b>период оплаты: </b> С 24.08.2021 По 22.10.2021 </div>";
-//        var messBody = "<br><br><b>Платеж от:</b> Прокофьев Александр Викторович<br><b>на сумму:</b> 4000.00 р.<br><b>описание услуги:</b> аренда кладовочки №: A2<br><b>период оплаты: </b> С 24.03./2022 По 22.05.2022 </div>";
-//        var messBody = "<br><br><b>Платеж от:</b> Фомин Денис Леонидович<br><b>на сумму:</b> 3500.00 р.<br><b>описание услуги:</b> аренда кладовочки №: 54<br><b>период оплаты: </b> С 24.01.2022 По 22.03.2022 </div>";
-        var fioStart = messBody.indexOf("Платеж от:");
+        // РїРѕР»СѓС‡Р°РµРј С‚РµР»Рѕ РїРёСЃСЊРјР° Рё РїРѕС‚СЂРѕС€РёРј РµРіРѕ РїРѕ РєР»СЋС‡РµРІС‹Рј С„СЂР°Р·Р°Рј
+        var messBody = messages[j].getBody();
+
+//        messBody = "<br><br><b>РџР»Р°С‚РµР¶ РѕС‚:</b> РљРѕРІРёРЅ Р›РµРѕРЅРёРґ РђСЂС‚СѓСЂРѕРІРёС‡<br><b>РЅР° СЃСѓРјРјСѓ:</b> 8000.00 СЂ.<br><b> РѕРїРёСЃР°РЅРёРµ СѓСЃР»СѓРіРё:</b> Р°СЂРµРЅРґР° РїРѕРјРµС‰РµРЅРёСЏ: в„–: A1<br><b>РїРµСЂРёРѕРґ РѕРїР»Р°С‚С‹: </b> РЎ 24.06.2021 РџРћ 31.07.2021 </div>";
+debugSheet.getRange(lastRowDebug,5).setValue(messBody);
+
+        var fioStart = messBody.indexOf("РџР»Р°С‚РµР¶ РѕС‚:");
+
+debugSheet.getRange(lastRowDebug,6).setValue(fioStart);
+
         if (fioStart < 0) {break}
-        var sumStart = messBody.indexOf("на сумму:");
-        var srvStart = messBody.indexOf("описание услуги:");
-        var payStart = messBody.indexOf("период оплаты:");
+        var sumStart = messBody.indexOf("РЅР° СЃСѓРјРјСѓ:");
+        var srvStart = messBody.indexOf("РѕРїРёСЃР°РЅРёРµ СѓСЃР»СѓРіРё:");
+        var payStart = messBody.indexOf("РїРµСЂРёРѕРґ РѕРїР»Р°С‚С‹:");
         var fioArr = messBody.substring(fioStart,sumStart);
         var sumArr = messBody.substring(sumStart,srvStart);
         var srvArr = messBody.substring(srvStart,payStart);
         var payArr = messBody.substr(payStart,messBody.length-payStart);
-        // выделяем нужную информацию о заказчике, сумме, помещении и периоде
+        // РІС‹РґРµР»СЏРµРј РЅСѓР¶РЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Р·Р°РєР°Р·С‡РёРєРµ, СЃСѓРјРјРµ, РїРѕРјРµС‰РµРЅРёРё Рё РїРµСЂРёРѕРґРµ
         var clientFio = strBwn (fioArr,"</b> ", "<br>");
-        var clientSum = strBwn (sumArr,"</b> ", " р.");
-        var clientSrv = strBwn (srvArr,"№: ", "<br>");
-        var clientDat = strBwn (payArr,"С ", " ");
+        clientFio = clientFio.trim();
+        clientFio = clientFio.replace("  "," ");        
+        clientFio = clientFio.replace("  "," ");
+        clientFio = clientFio.toUpperCase();
+        var clientSum = strBwn (sumArr,"</b> ", " СЂ.");
+        clientSum = clientSum.replace(".",",");
+        var clientSrv = strBwn (srvArr,"в„–: ", "<br>");
+        var clientDat = strBwn (payArr,"РЎ ", " ");
+        if (clientDat.length < 24) clientDat = strBwn (payArr,"РЎ ", "21") + "21";
+        if (clientDat.length < 24) clientDat = strBwn (payArr,"РЎ ", "22") + "22";
         var clientDatS = clientDat.substr(0,10);
         var clientDatE = clientDat.substr(14,10);
+        var clientDatEE = new Date(Number(clientDatE.substr(6,4)),Number(clientDatE.substr(3,2))-1,Number(clientDatE.substr(0,2)));
+        var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+        var clientDatEEE = new Date(clientDatEE.getTime() + MILLIS_PER_DAY);
+        clientDatE = Utilities.formatDate(clientDatEEE,"UTC","dd.MM.yyyy");
 
-        // задаем правила поиска помещений
-        if (clientSrv.charCodeAt(0) > 47) var paySheetName = "Оплата Кап"
-        if (clientSrv.charCodeAt(0) > 64) var paySheetName = "Оплата Бел"
-        if (clientSrv.charCodeAt(0) > 96) var paySheetName = "Оплата НО"
+debugSheet.getRange(lastRowDebug,7).setValue(clientFio);
+debugSheet.getRange(lastRowDebug,8).setValue(clientSum);
+debugSheet.getRange(lastRowDebug,9).setValue(clientSrv);
+debugSheet.getRange(lastRowDebug,10).setValue(clientDat);
+debugSheet.getRange(lastRowDebug,11).setValue(clientDatS);
+debugSheet.getRange(lastRowDebug,12).setValue(clientDatE);
 
-        // помечаем сообщение как прочитанное
-        messages[j].markRead();
+        // Р·Р°РґР°РµРј РїСЂР°РІРёР»Р° РїРѕРёСЃРєР° РїРѕРјРµС‰РµРЅРёР№
+        if ((clientSrv.charCodeAt(0) == 88) || (clientSrv.charCodeAt(0) == 120)) var clientSrv = clientSrv.toLowerCase()
+        if (clientSrv.charCodeAt(0) > 47) var paySheetName = "РћРїР»Р°С‚Р° РљР°Рї"
+        if (clientSrv.charCodeAt(0) > 64) var paySheetName = "РћРїР»Р°С‚Р° Р‘РµР»"
+        if (clientSrv.charCodeAt(0) > 96) var paySheetName = "РћРїР»Р°С‚Р° РќРћ"  
 
-        // получаем список листов
-        var sheetsOf = SpreadsheetApp.getActiveSpreadsheet().getSheets();
-        for (var k = 0; k< sheetsOf.length; k++){
-          // если абонент найден - выходим из цикла
-          if (foundCell>0) {break}
-          var curSheetName = sheetsOf[k].getSheetName();
-          // если наименование листа совпадает с правилом - будем искать в нем помещение+фио клиента
-          if (curSheetName == paySheetName) {
-          // определяем зону платежей = имя таблицы с _ вместо пробела
-          var payTable = SpreadsheetApp.getActiveSpreadsheet().getRangeByName(curSheetName.substr(0,6)+"_"+curSheetName.substr(7,curSheetName.length-7));
-          var lastRow = payTable.getLastRow();
-          var rooms = sheetsOf[k].getRange(2,1,lastRow,1).getValues();
-          var clients = sheetsOf[k].getRange(2,9,lastRow,1).getValues();
-          var payDog = sheetsOf[k].getRange(2,5,lastRow,1).getValues();
+debugSheet.getRange(lastRowDebug,13).setValue(paySheetName);      
+        
+        var paySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(paySheetName);
+        // РѕРїСЂРµРґРµР»СЏРµРј Р·РѕРЅСѓ РїР»Р°С‚РµР¶РµР№ = РёРјСЏ С‚Р°Р±Р»РёС†С‹ СЃ _ РІРјРµСЃС‚Рѕ РїСЂРѕР±РµР»Р°
+        var payTable = SpreadsheetApp.getActiveSpreadsheet().getRangeByName(paySheetName.substr(0,6)+"_"+paySheetName.substr(7,paySheetName.length-7));
+        var lastRow = payTable.getLastRow();
+        var rooms = paySheet.getRange(2,1,lastRow,1).getValues();
+        var clients = paySheet.getRange(2,9,lastRow,1).getValues();
 
-          foundCell = rooms.findIndex(clientSrv);
-          if (foundCell > 0) {
-            var endCC = clients[foundCell][0].indexOf("Договор");
-            var curCli = clients[foundCell][0].substr(0,endCC-1);
-            if (clientFio == curCli) {
-              payCount++;
-              var payMonthArr = sheetsOf[k].getRange(foundCell+2,payTable.getColumn(),1,30);
-              // оплата производится в зону именованного диапазона оплат
-              var payMonth = Number(clientDatS.split(".")[1])+12*(Number(clientDatS.split(".")[2])-2021);
-              var remMonth = Number(clientDatE.split(".")[1])+12*(Number(clientDatE.split(".")[2])-2021);
-              var payMonthArr = sheetsOf[k].getRange(foundCell+2,payTable.getColumn(),1,remMonth);
-              var payBefore = payMonthArr.getCell(1,payMonth).getValue();
-              payMonthArr.getCell(1,payMonth).setValue(Number(clientSum)+payBefore);
-              var colourSet = Math.trunc((Number(clientSum)+payBefore)/payDog[foundCell][0]);
+        // Р·Р°РїСѓСЃРєР°РµРј РїРѕРёСЃРє РїРѕ РЅРѕРјРµСЂСѓ РїРѕРјРµС‰РµРЅРёСЏ
+        foundCell = rooms.findIndex(clientSrv);
 
-// Logger.log("paymonth = %s, remmonth = %s, дог оплата = %s, тек оплата %s, colourset = %s",payMonth,remMonth,payDog[foundCell][0],Number(clientSum)+payBefore,colourSet);
+debugSheet.getRange(lastRowDebug,14).setValue(foundCell+2);      
 
-              if (colourSet > 0) sheetsOf[k].getRange(foundCell+2,payTable.getColumn()+payMonth-1,1,colourSet).setBackground("lime");
-              payMonthArr.getCell(1,remMonth).setNote("Требуется оплата " + clientDatE);
-              payMonthArr.getCell(1,remMonth).setBackground("yellow");
-            }
+        if (foundCell >= 0) {
+          var endCC = clients[foundCell][0].toUpperCase().indexOf("Р”РћР“РћР’РћР ");
+          var curCli = clients[foundCell][0].substr(0,endCC-1).toUpperCase();
+
+debugSheet.getRange(lastRowDebug,15).setValue(clients[foundCell][0]);
+debugSheet.getRange(lastRowDebug,16).setValue(curCli);
+
+          curCli = curCli.trim();
+          curCli = curCli.replace("  "," ");
+
+          // РїСЂРѕРІРµСЂСЏРµРј - С‚РѕС‚ Р»Рё СЌС‚Рѕ РєР»РёРµРЅС‚
+          if (clientFio == curCli) {
+            payCount++;
+            var payTableLastCol = paySheet.getLastColumn(); 
+            var payMonthArr = paySheet.getRange(foundCell+2,payTable.getColumn(),1,payTableLastCol);
+            // РѕРїР»Р°С‚Р° РїСЂРѕРёР·РІРѕРґРёС‚СЃСЏ РІ Р·РѕРЅСѓ РёРјРµРЅРѕРІР°РЅРЅРѕРіРѕ РґРёР°РїР°Р·РѕРЅР° РѕРїР»Р°С‚
+            var payMonth = Number(clientDatS.split(".")[1])+12*(Number(clientDatS.split(".")[2])-2021);
+            var remMonth = Number(clientDatE.split(".")[1])+12*(Number(clientDatE.split(".")[2])-2021);
+
+debugSheet.getRange(lastRowDebug,17).setValue(payMonth);     
+debugSheet.getRange(lastRowDebug,18).setValue(remMonth);     
+
+//            var payMonthArr = paySheet.getRange(foundCell+2,payTable.getColumn(),1,remMonth);
+            var payBefore = payMonthArr.getCell(1,messMonth).getValue().toString();
+            payBefore = payBefore.replace(".",",");
+            payMonthArr.getCell(1,messMonth).setFormula("="+payBefore+"+"+clientSum);
+            var oldNote = payMonthArr.getCell(1,messMonth).getNote();
+            payMonthArr.getCell(1,messMonth).setNote("РџР»Р°С‚РµР¶ РѕС‚: " + clientFio + "\nРЅР° СЃСѓРјРјСѓ: " + clientSum + "\nРѕРїРёСЃР°РЅРёРµ СѓСЃР»СѓРіРё: " + clientSrv + "\nРїРµСЂРёРѕРґ РѕРїР»Р°С‚С‹: " + clientDat + "\n" + oldNote);
+            
+            // РєСЂР°СЃРёРј СЏС‡РµР№РєРё Рё РґРѕР±Р°РІР»СЏРµРј РїСЂРёРјРµС‡Р°РЅРёРµ
+            paySheet.getRange(foundCell+2,payTable.getColumn()+payMonth-1,1,remMonth-payMonth+1).setBackground("lime");
+            oldNote = payMonthArr.getCell(1,remMonth).getNote();
+            payMonthArr.getCell(1,remMonth).setNote("РўСЂРµР±СѓРµС‚СЃСЏ РѕРїР»Р°С‚Р° " + clientDatE + "\n" + oldNote);
+            payMonthArr.getCell(1,remMonth).setBackground("yellow")
+            // РїРѕРјРµС‡Р°РµРј СЃРѕРѕР±С‰РµРЅРёРµ РєР°Рє РїСЂРѕС‡РёС‚Р°РЅРЅРѕРµ Рё СЃРЅРёРјР°РµРј Р·РІРµР·РґРѕС‡РєСѓ
+            messages[j].unstar();
+            messages[j].markRead();
           }
         }
       }
     }
-    }
   }
-  // выводим статистику
-  var statInfo = String(emailCount) + " писем обработано. " + String(payCount) + " оплат внесено";
-  SpreadsheetApp.getActiveSpreadsheet().toast(statInfo, "Статус", 3);
+  // РІС‹РІРѕРґРёРј СЃС‚Р°С‚РёСЃС‚РёРєСѓ
+  var statInfo = String(emailCount) + " РїРёСЃРµРј РѕР±СЂР°Р±РѕС‚Р°РЅРѕ. " + String(payCount) + " РѕРїР»Р°С‚ РІРЅРµСЃРµРЅРѕ";
+  SpreadsheetApp.getActiveSpreadsheet().toast(statInfo, "РЎС‚Р°С‚СѓСЃ", 3);
 }
 
-// функция поиска строки между fStr и lStr
+// С„СѓРЅРєС†РёСЏ РїРѕРёСЃРєР° СЃС‚СЂРѕРєРё РјРµР¶РґСѓ fStr Рё lStr
 function strBwn (str, fStr, lStr) {
   var fNdx = str.indexOf(fStr) + fStr.length;
   var lNdx = str.lastIndexOf(lStr);
   return str.substring(fNdx,lNdx);
 }
 
-// заполнение листа "Арендаторы"
+// Р·Р°РїРѕР»РЅРµРЅРёРµ Р»РёСЃС‚Р° "РђСЂРµРЅРґР°С‚РѕСЂС‹"
 function contSync() {
-// получение данных из группы "Арендаторы" Контактов
-var clientsG = ContactsApp.getContactGroup("Арендаторы");
+// РїРѕР»СѓС‡РµРЅРёРµ РґР°РЅРЅС‹С… РёР· РіСЂСѓРїРїС‹ "РђСЂРµРЅРґР°С‚РѕСЂС‹" РљРѕРЅС‚Р°РєС‚РѕРІ
+var clientsG = ContactsApp.getContactGroup("РђСЂРµРЅРґР°С‚РѕСЂС‹");
 var clients = clientsG.getContacts();
-// получение текущего положения
-var curSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Арендаторы");
-// очистка
+// РїРѕР»СѓС‡РµРЅРёРµ С‚РµРєСѓС‰РµРіРѕ РїРѕР»РѕР¶РµРЅРёСЏ
+var curSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("РђСЂРµРЅРґР°С‚РѕСЂС‹");
+// РѕС‡РёСЃС‚РєР°
 curSheet.getRange(2,2,500,7).clear();
-// заполнение полей данными
+// Р·Р°РїРѕР»РЅРµРЅРёРµ РїРѕР»РµР№ РґР°РЅРЅС‹РјРё
 for (var i=0; i<clients.length; i++) {
   curSheet.getRange(i+2, 2, 1, 1).setValue(clients[i].getGivenName());
   curSheet.getRange(i+2, 3, 1, 1).setValue(clients[i].getFamilyName());  
@@ -136,7 +185,7 @@ for (var i=0; i<clients.length; i++) {
   }
 }
 
-// функция поиска значения в массиве
+// С„СѓРЅРєС†РёСЏ РїРѕРёСЃРєР° Р·РЅР°С‡РµРЅРёСЏ РІ РјР°СЃСЃРёРІРµ
 Array.prototype.findIndex = function(search){
   if(search == "") return -1;
   for (var i=0; i<this.length; i++)
