@@ -23,7 +23,7 @@ function onEdit() {
   var col = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveCell().getColumn();
   var row = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveCell().getRow();
   // получаем заголовок текущего уровня
-  var lvlName = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(1,col).getValue().toString().toUpperCase();
+  var lvlName = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(1,col).getValue().toString().toUpperCase().trim().replace(" ","");
   // в зависимости от заготовка определяем колонку уровня в SELECTION
   var lvl = 0;
   if (lvlName == "LEVEL1") lvl = 1; 
@@ -37,7 +37,7 @@ function onEdit() {
   }
   if (lvl > 0) {
     var lvUp = "";
-    for (var j=lvl; j>0; j--) lvUp = lvUp + SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(row,col-j+1).getValue().toString().toUpperCase();
+    for (var j=lvl; j>0; j--) lvUp = lvUp + SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(row,col-j+1).getValue().toString().toUpperCase().trim().replace(" ","");
     // вытаскиваем справочник в массив
     var levelRange = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("SELECTION").getValues();
     // ищем значения следующего уровня для значения текущего
@@ -60,7 +60,7 @@ Array.prototype.getSubLevel = function(levelUp,colSel){
   var lvlUpVol = ""; 
   for (var i=0; i<this.length; i++) {
     lvlUpVol = "";
-    for (var j=0; j<colSel; j++) lvlUpVol = lvlUpVol + this[i][j].toUpperCase();
+    for (var j=0; j<colSel; j++) lvlUpVol = lvlUpVol + this[i][j].toUpperCase().trim().replace(" ","");
     if (lvlUpVol == levelUp) {
       // заменяем точку на заковырку и добавляем к условию выбора
       var modifiedCrit = String(this[i][colSel]);
