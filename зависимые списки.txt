@@ -30,7 +30,7 @@ function onEdit() {
   if (lvlName == "LEVEL2") lvl = 2; 
   if (lvlName == "LEVEL3") lvl = 3;
   // заменяем заковырку обратно на запятую
-  if ((lvlName == "LEVEL1") || (lvlName == "LEVEL2") || (lvlName == "LEVEL3") || (lvlName = 'LEVEL4')) {
+  if ((lvlName == "LEVEL1") || (lvlName == "LEVEL2") || (lvlName == "LEVEL3") || (lvlName = "LEVEL4")) {
     var cellValue = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveCell().getValue();
     cellValue = cellValue.replace("¸",","); 
     SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getActiveCell().setValue(cellValue);
