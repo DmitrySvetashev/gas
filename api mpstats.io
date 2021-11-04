@@ -7,13 +7,15 @@ function onOpen() {
   .addItem('Информация о товаре', 'skuInfo')
   .addItem('Продажи за период', 'skuSales')
   .addItem('Похожие товары', 'skuSimilar')
+  .addItem('Заполнить данные', 'skuFill')
   .addToUi();
 }
 
 const apiUrl = 'https://mpstats.io/api/';
+const millsPerDay = 1000 * 60 * 60 * 24;
 
 function skuInfo () {
-  ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Товарная позиция');
+  var ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_товарная позиция');
   var sku = ss.getRange(2,1).getValue();
   var token = ss.getRange(2,4).getValue();
   var servUrl = apiUrl + 'wb/get/item/' + sku;
@@ -57,7 +59,7 @@ function skuInfo () {
 }
 
 function skuSales () {
-  ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Товарная позиция');
+  var ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_товарная позиция');
   var sku = ss.getRange(2,1).getValue();
   var token = ss.getRange(2,4).getValue();
   var d1 = Utilities.formatDate(ss.getRange(2,2).getValue(),SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
@@ -78,7 +80,7 @@ function skuSales () {
   let response = UrlFetchApp.fetch(servUrl, options);
   let data = JSON.parse(response);
 
-  ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('продажи');
+  ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_продажи');
 
   for (var i=0; i<data.length; i++) {
     ss.appendRow([data[i].no_data,data[i].data,data[i].balance,data[i].sales,data[i].rating,data[i].price,data[i].final_price,data[i].is_new,data[i].comments,data[i].discount,data[i].basic_sale,data[i].basic_price,data[i].promo_sale,data[i].client_sale,data[i].client_price]);
@@ -86,7 +88,7 @@ function skuSales () {
 }
 
 function skuSimilar () {
-  ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Товарная позиция');
+  var ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_товарная позиция');
   var sku = ss.getRange(2,1).getValue();
   var token = ss.getRange(2,4).getValue();
   var d1 = Utilities.formatDate(ss.getRange(2,2).getValue(),SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
@@ -107,9 +109,51 @@ function skuSimilar () {
   let response = UrlFetchApp.fetch(servUrl, options);
   let data = JSON.parse(response);
 
-  ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('похожие');
+  ss = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_похожие');
 
   for (var i=0; i<data.length; i++) {
     ss.appendRow([data[i].id,data[i].name,data[i].final_price,data[i].sales,data[i].brand,data[i].seller,data[i].revenue,data[i].rating,data[i].comments,data[i].balance,data[i].is_fbs,data[i].thumb,data[i].thumb_middle]);
+  }
+}
+
+
+function skuFill () {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('_товарная позиция');
+  var token = sheet.getRange(2,4).getValue();
+  var now = new Date();
+  var yesterday = new Date(now.getTime() - millsPerDay);
+  var curDate = Utilities.formatDate(yesterday,SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(),'yyyy-MM-dd');
+
+  var hdr = {
+      'X-Mpstats-TOKEN': token,
+      'Content-Type': 'application/json',
+      'maxRedirects' : 20
+  };
+
+  var options = {
+      'method': 'GET',
+      'headers': hdr,
+  };
+
+  var sheets = ss.getSheets();
+  for (var i=0; i<sheets.length; i++) {
+    if (sheets[i].getSheetName().charAt(0) != '_') {
+      var lastRow = sheets[i].getLastRow();
+      var blockDate = Utilities.formatDate(sheets[i].getRange(1,8).getValue(),ss.getSpreadsheetTimeZone(),'yyyy-MM-dd');
+      if (blockDate != curDate) {
+        sheets[i].insertColumnsAfter(7,5);
+        sheets[i].getRange(1,3,lastRow,5).copyTo(sheets[i].getRange(1,8,lastRow,5));
+        sheets[i].getRange(1,8).setValue(yesterday);
+      }
+      for (var j=3; j<lastRow+1;j++) {
+        var sku = sheets[i].getRange(j,2).getValue();
+        if (sku == '') break;
+        var servUrl = apiUrl + 'wb/get/item/' + sku + '/sales?d1=' + curDate + '&d2=' + curDate;
+        let response = UrlFetchApp.fetch(servUrl, options);
+        let data = JSON.parse(response);
+        sheets[i].getRange(j,8,1,2).setValues([[data[0].sales,data[0].final_price]]);
+      }
+    }
   }
 }
