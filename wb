@@ -4,51 +4,23 @@ function onOpen() {
   // добавление пункта меню в оболочку
   .createMenu('Команды')
   // добавление подпунктов
-  .addItem('Продажи за период', 'salesPeriod')
   .addItem('Продажи за дату', 'salesDate')  
   .addItem('Заказы', 'orders')
   .addItem('Склад (на сегодня)', 'stocks')
   .addItem('Поставки (на сегодня)', 'incomes')
+  .addItem('Заказы (по часам)', 'ordersByHour')
   .addToUi();
 }
 
 const apiUrl = 'https://suppliers-stats.wildberries.ru/api/v1/supplier';
-const token = '';
+const token = 'ZWE3YmEyODEtMGMyNy00YTg3LThhZmItOGQxZmMzOWUyOTQ1';
 const millsPerDay = 1000 * 60 * 60 * 24;
-
-function salesPeriod () {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Еженедельный');
-  var dateStart = sheet.getRange(2,2).getValue();
-  var dateEnd = sheet.getRange(3,2).getValue();
-  var now = new Date();
-  var yesterday = new Date(now.getTime() - millsPerDay);
-  if (dateEnd > yesterday) dateEnd = yesterday;
-
-  var dateStartStr = Utilities.formatDate(dateStart,SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(),'yyyy-MM-dd');
-  var dateEndStr = Utilities.formatDate(dateEnd,SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(),'yyyy-MM-dd');
-
-  var hdr = {
-      'Content-Type': 'application/json',
-      'maxRedirects' : 20
-  };
-
-  var options = {
-      'method': 'GET',
-      'headers': hdr,
-  };
-
-  var sheet = ss.getSheetByName('Продажи за период');
-  var servUrl = apiUrl + '/reportDetailByPeriod?dateFrom=' + dateStartStr + '&dateTo=' + dateEndStr + '&key=' + token;
-  let response = UrlFetchApp.fetch(servUrl, options);
-  let data = JSON.parse(response);
-  for (var i=0; i<data.length; i++) sheet.appendRow([data[i].realizationreport_id,data[i].suppliercontract_code,data[i].rr_dt,data[i].rrd_id,data[i].gi_id,data[i].subject_name,data[i].NM_id,data[i].brand_name,data[i].sa_name,data[i].ts_name,data[i].barcode,data[i].doc_type_name,data[i].quantity,data[i].nds,data[i].cost_amount,data[i].retail_price,data[i].retail_amount,data[i].retail_commission,data[i].sale_percent,data[i].commission_percent,data[i].customer_reward,data[i].supplier_reward,data[i].office_name,data[i].supplier_oper_name,data[i].order_dt,data[i].sale_dt,data[i].shk_id,data[i].retail_price_withdisc_rub,data[i].for_pay,data[i].for_pay_nds,data[i].delivery_amount,data[i].return_amount,data[i].delivery_rub,data[i].gi_box_type_name,data[i].product_discount_for_report,data[i].supplier_promo,data[i].supplier_spp]);
-}
 
 function salesDate () {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Еженедельный');
-  var dateStart = sheet.getRange(2,2).getValue();
+  var sheet = ss.getSheetByName('Ежедневный');
+  var dateStart = sheet.getRange(1,1).getValue();
+  var article = sheet.getRange(1,2).getValue();
   var now = new Date();
   var yesterday = new Date(now.getTime() - millsPerDay);
   if (dateStart > yesterday) dateStart = yesterday;
@@ -66,16 +38,21 @@ function salesDate () {
   };
 
   var sheet = ss.getSheetByName('Продажи за дату');
+  if (sheet.getLastRow() > 1) sheet.getRange(2,1,sheet.getLastRow()-1,sheet.getLastColumn()).clearContent();
   var servUrl = apiUrl + '/sales?dateFrom=' + dateStartStr + '&key=' + token;
   let response = UrlFetchApp.fetch(servUrl, options);
   let data = JSON.parse(response);
-  for (var i=0; i<data.length; i++) sheet.appendRow([data[i].Number,data[i].Date,data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].barcode,data[i].quantity,data[i].totalPrice,data[i].discountPercent,data[i].isSupply,data[i].isRealization,data[i].orderId,data[i].promoCodeDiscount,data[i].warehouseName,data[i].countryName,data[i].oblastOkrugName,data[i].regionName,data[i].incomeID,data[i].saleID,data[i].odid,data[i].spp,data[i].forpay,data[i].finished_price,data[i].pricewithdisc,data[i].nmId,data[i].subject,data[i].category,data[i].brand,data[i].IsStorno]);
+  for (var i=0; i<data.length; i++) {
+    if (article == '') sheet.appendRow([data[i].Number,data[i].Date,data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].barcode,data[i].quantity,data[i].totalPrice,data[i].discountPercent,data[i].isSupply,data[i].isRealization,data[i].orderId,data[i].promoCodeDiscount,data[i].warehouseName,data[i].countryName,data[i].oblastOkrugName,data[i].regionName,data[i].incomeID,data[i].saleID,data[i].odid,data[i].spp,data[i].forpay,data[i].finished_price,data[i].pricewithdisc,data[i].nmId,data[i].subject,data[i].category,data[i].brand,data[i].IsStorno]);
+    else if (article == data[i].supplierArticle) sheet.appendRow([data[i].Number,data[i].Date,data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].barcode,data[i].quantity,data[i].totalPrice,data[i].discountPercent,data[i].isSupply,data[i].isRealization,data[i].orderId,data[i].promoCodeDiscount,data[i].warehouseName,data[i].countryName,data[i].oblastOkrugName,data[i].regionName,data[i].incomeID,data[i].saleID,data[i].odid,data[i].spp,data[i].forpay,data[i].finished_price,data[i].pricewithdisc,data[i].nmId,data[i].subject,data[i].category,data[i].brand,data[i].IsStorno]);
+  }
 }
 
 function orders () {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Еженедельный');
-  var dateStart = sheet.getRange(2,2).getValue();
+  var sheet = ss.getSheetByName('Ежедневный');
+  var dateStart = sheet.getRange(1,1).getValue();
+  var article = sheet.getRange(1,2).getValue();
   var now = new Date();
   var yesterday = new Date(now.getTime() - millsPerDay);
   if (dateStart > yesterday) dateStart = yesterday;
@@ -93,13 +70,20 @@ function orders () {
   };
 
   var sheet = ss.getSheetByName('Заказы');
+  if (sheet.getLastRow() > 1) sheet.getRange(2,1,sheet.getLastRow()-1,sheet.getLastColumn()).clearContent();
   var servUrl = apiUrl + '/orders?dateFrom=' + dateStartStr + '&key=' + token;
   let response = UrlFetchApp.fetch(servUrl, options);
   let data = JSON.parse(response);
-  for (var i=0; i<data.length; i++) sheet.appendRow([data[i].number,data[i].date,data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].barcode,data[i].quantity,data[i].totalPrice,data[i].discountPercent,data[i].warehouseName,data[i].oblast,data[i].incomeID,data[i].odid,data[i].nmid,data[i].subject,data[i].category,data[i].brand,data[i].is_cancel,data[i].cancel_dt]);
+  for (var i=0; i<data.length; i++) {
+    if (article == '') sheet.appendRow([data[i].number,data[i].date,data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].barcode,data[i].quantity,data[i].totalPrice,data[i].discountPercent,data[i].warehouseName,data[i].oblast,data[i].incomeID,data[i].odid,data[i].nmid,data[i].subject,data[i].category,data[i].brand,data[i].is_cancel,data[i].cancel_dt]);
+    else if (article == data[i].supplierArticle) sheet.appendRow([data[i].number,data[i].date,data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].barcode,data[i].quantity,data[i].totalPrice,data[i].discountPercent,data[i].warehouseName,data[i].oblast,data[i].incomeID,data[i].odid,data[i].nmid,data[i].subject,data[i].category,data[i].brand,data[i].is_cancel,data[i].cancel_dt]);
+  }
 }
 
 function stocks () {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Ежедневный');
+  var article = sheet.getRange(1,2).getValue();
   var now = new Date();
   var dateStartStr = Utilities.formatDate(now,SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(),'yyyy-MM-dd');
 
@@ -113,15 +97,21 @@ function stocks () {
       'headers': hdr,
   };
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Склад');
+  if (sheet.getLastRow() > 1) sheet.getRange(2,1,sheet.getLastRow()-1,sheet.getLastColumn()).clearContent();
   var servUrl = apiUrl + '/stocks?dateFrom=' + dateStartStr + '&key=' + token;
   let response = UrlFetchApp.fetch(servUrl, options);
   let data = JSON.parse(response);
-  for (var i=0; i<data.length; i++) sheet.appendRow([data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].Barcode,data[i].Quantity,data[i].isSupply,data[i].isRealization,data[i].quantityFull,data[i].quantityNotInOrders,data[i].warehouseName,data[i].inWayToClient,data[i].inWayFromClient,data[i].nmid,data[i].subject,data[i].category,data[i].DaysOnSite,data[i].brand,data[i].SCCode]);
+  for (var i=0; i<data.length; i++) {
+    if (article == '') sheet.appendRow([data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].Barcode,data[i].Quantity,data[i].isSupply,data[i].isRealization,data[i].quantityFull,data[i].quantityNotInOrders,data[i].warehouseName,data[i].inWayToClient,data[i].inWayFromClient,data[i].nmid,data[i].subject,data[i].category,data[i].DaysOnSite,data[i].brand,data[i].SCCode]);
+    else if (article == data[i].supplierArticle) sheet.appendRow([data[i].lastChangeDate,data[i].supplierArticle,data[i].techSize,data[i].Barcode,data[i].Quantity,data[i].isSupply,data[i].isRealization,data[i].quantityFull,data[i].quantityNotInOrders,data[i].warehouseName,data[i].inWayToClient,data[i].inWayFromClient,data[i].nmid,data[i].subject,data[i].category,data[i].DaysOnSite,data[i].brand,data[i].SCCode]);
+  }
 }
 
 function incomes () {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Ежедневный');
+  var article = sheet.getRange(1,2).getValue();
   var now = new Date();
   var dateStartStr = Utilities.formatDate(now,SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(),'yyyy-MM-dd');
 
@@ -135,10 +125,95 @@ function incomes () {
       'headers': hdr,
   };
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Поставки');
+  if (sheet.getLastRow() > 1) sheet.getRange(2,1,sheet.getLastRow()-1,sheet.getLastColumn()).clearContent();
   var servUrl = apiUrl + '/stocks?dateFrom=' + dateStartStr + '&key=' + token;
   let response = UrlFetchApp.fetch(servUrl, options);
   let data = JSON.parse(response);
-  for (var i=0; i<data.length; i++) sheet.appendRow([data[i].incomeid,data[i].Number,data[i].Date,data[i].lastChangeDate,data[i].SupplierArticle,data[i].TechSize,data[i].Barcode,data[i].Quantity,data[i].totalPrice,data[i].dateClose,data[i].warehouseName,data[i].nmid,data[i].status]);
+  for (var i=0; i<data.length; i++) {
+    if (article == '') sheet.appendRow([data[i].incomeid,data[i].Number,data[i].Date,data[i].lastChangeDate,data[i].SupplierArticle,data[i].TechSize,data[i].Barcode,data[i].Quantity,data[i].totalPrice,data[i].dateClose,data[i].warehouseName,data[i].nmid,data[i].status]);
+    else if (article == data[i].supplierArticle) sheet.appendRow([data[i].incomeid,data[i].Number,data[i].Date,data[i].lastChangeDate,data[i].SupplierArticle,data[i].TechSize,data[i].Barcode,data[i].Quantity,data[i].totalPrice,data[i].dateClose,data[i].warehouseName,data[i].nmid,data[i].status]);
+  } 
+}
+
+function ordersByHour () {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Ежедневный');
+  var dateStart = sheet.getRange(1,1).getValue();
+  var article = sheet.getRange(1,2).getValue();
+//  var now = new Date();
+//  var yesterday = new Date(now.getTime() - millsPerDay);
+//  if (dateStart > yesterday) dateStart = yesterday;
+
+  var dateStartStr = Utilities.formatDate(dateStart,SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(),'yyyy-MM-dd');
+
+  var hdr = {
+      'Content-Type': 'application/json',
+      'maxRedirects' : 20
+  };
+
+  var options = {
+      'method': 'GET',
+      'headers': hdr,
+  };
+
+  var sheet = ss.getSheetByName('Заказы по часам');
+  if (sheet.getMaxColumns() > 26) sheet.deleteColumns(27,sheet.getMaxColumns()-26);
+  if (sheet.getMaxRows() > 3) sheet.deleteRows(4,sheet.getMaxRows()-3);
+  sheet.insertColumnsAfter(26,25);
+  sheet.getRange(1,2,sheet.getLastRow(),25).copyTo(sheet.getRange(1,27,sheet.getLastRow(),25));
+  sheet.getRange(1,27).setValue(dateStart);
+  
+  var servUrl = apiUrl + '/orders?dateFrom=' + dateStartStr + '&key=' + token;
+  try {
+    let response = UrlFetchApp.fetch(servUrl, options);
+    if (response.getResponseCode() == 200) {
+      let data = JSON.parse(response);
+      var lastRow = sheet.getMaxRows();
+      var articles = [[]];
+      articles.shift();
+      var orders = [[]];
+      orders.shift();
+      if (lastRow > 2) {
+        articles = sheet.getRange(3,1,lastRow-2,1).getValues();
+        orders = sheet.getRange(3,27,lastRow-2,24).getValues();
+      }
+      else {
+        articles.push([data[0].supplierArticle]);
+        orders.push(['','','','','','','','','','','','','','','','','','','','','','','','']);
+      }
+      for (var i=0; i<data.length; i++) {
+        var orderDateStr = data[i].date.split('T');
+        if (orderDateStr[0] == dateStartStr) {
+          var curPos = -1;
+          for (var j=0; j<articles.length; j++) {
+            if (data[i].supplierArticle == articles[j][0]) {
+              curPos = j;
+              break;
+            }
+          }
+      
+          if (curPos == -1) {
+            articles.push([data[i].supplierArticle]);
+            orders.push(['','','','','','','','','','','','','','','','','','','','','','','','']);
+            curPos = articles.length-1;
+          }
+          var orderHour = Number(orderDateStr[1].substr(0,2));
+          orders[curPos][orderHour] = Number(orders[curPos][orderHour]) + Number(data[i].quantity);
+        }
+      }
+      if (articles.length > lastRow-2) sheet.insertRowsAfter(lastRow,articles.length-lastRow+3);
+      sheet.getRange(3,1,articles.length).setValues(articles);
+      sheet.getRange(3,27,orders.length,24).setValues(orders);
+      sheet.getRange(3,51,sheet.getMaxRows(),1).setFormula('=SUM(AA3:AX3)');
+      sheet.deleteRows(articles.length+3,sheet.getMaxRows()-articles.length-3);
+      sheet.getRange(sheet.getMaxRows(),27,1,24).setFormula('=SUM(AA3:AA'+(sheet.getLastRow()-1).toString()+')');
+      sheet.getRange(sheet.getLastRow(),1).setValue('Ʃ');
+      sheet.getRange(sheet.getLastRow(),1,1,51).clearFormat();
+    }
+  }
+  catch (err)
+  {
+    Logger.log(err);      
+  }
 }
