@@ -1,0 +1,24 @@
+function filesList(folderID) {
+  var fileArr = [];
+  var folders = fList(folderID,'folders');
+  if (folders.length != 0)
+    for (var f=0; f<folders.length; f++)
+      fileArr = fileArr.concat(filesList(folders[f].id));
+  fileArr = fileArr.concat(fList(folderID,'files'));
+  return fileArr;
+}
+
+function fList(folderID,entity) {
+  var folder = DriveApp.getFolderById(folderID);
+  var entities = [];
+  Logger.log(folder.getName());
+  if (entity =='files')
+    var elements = folder.getFiles()
+  else var elements = folder.getFolders();
+  while (elements.hasNext()) {
+    var element = elements.next();
+    Logger.log(element.getName());
+    entities.push({"name":element.getName(),"id":element.getId()});
+  }
+  return entities;
+}
